@@ -8,7 +8,8 @@ function isAllowedPath(pathname: string) {
     pathname === "/favicon.ico" ||
     pathname === "/robots.txt" ||
     pathname === "/sitemap.xml" ||
-    pathname.startsWith("/_next/")
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/stickers/")
   );
 }
 
