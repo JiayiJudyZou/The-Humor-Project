@@ -219,7 +219,8 @@ export default function VotePage() {
 
       const safeVote = voteRow as CurrentCaptionVoteRow | null;
       if (safeVote?.vote_value === 1 || safeVote?.vote_value === -1) {
-        setVotesByCaptionId((prev) => ({ ...prev, [currentCaption.id]: safeVote.vote_value }));
+        const voteValue: 1 | -1 = safeVote.vote_value === 1 ? 1 : -1;
+        setVotesByCaptionId((prev) => ({ ...prev, [currentCaption.id]: voteValue }));
       }
       if (safeVote?.created_datetime_utc) {
         setCreatedAtByCaption((prev) => ({
@@ -279,7 +280,8 @@ export default function VotePage() {
 
         ((voteRows ?? []) as VoteRow[]).forEach((vote) => {
           if (vote.vote_value === 1 || vote.vote_value === -1) {
-            nextVotes[vote.caption_id] = vote.vote_value;
+            const voteValue: 1 | -1 = vote.vote_value === 1 ? 1 : -1;
+            nextVotes[vote.caption_id] = voteValue;
           }
           if (vote.created_datetime_utc) {
             nextCreatedAtByCaption[vote.caption_id] = vote.created_datetime_utc;
