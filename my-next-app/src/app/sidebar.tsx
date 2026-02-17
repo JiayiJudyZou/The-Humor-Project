@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const tabs = [
   { label: "Hello World", href: "/" },
   { label: "Crackd", href: "/crackd" },
+  { label: "Vote", href: "/vote" },
 ];
 
 export default function Sidebar() {

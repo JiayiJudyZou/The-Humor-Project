@@ -4,7 +4,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 let browserClient: SupabaseClient | null = null;
 let hasLoggedSupabaseConfigWarning = false;
 
-const TARGET_SUPABASE_URL = "https://secure.almostcrackd.ai";
 const PREVIOUS_SUPABASE_PROJECT_REF = "qihsgnfjqmkjmoowyfbn";
 
 function decodeBase64Url(base64Url: string): string | null {
@@ -43,41 +42,17 @@ function warnIfSupabaseConfigLooksMismatched() {
   hasLoggedSupabaseConfigWarning = true;
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-  if (supabaseUrl !== TARGET_SUPABASE_URL) return;
+  if (!supabaseUrl) return;
 
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
-  const problems: string[] = [];
-
-  if (!anonKey) {
-    problems.push("anon key is missing");
-  } else {
-    const lowered = anonKey.toLowerCase();
-    if (
-      lowered.includes("your_anon_key") ||
-      lowered.includes("placeholder") ||
-      lowered.includes("replace_me")
-    ) {
-      problems.push("anon key looks like a placeholder");
-    }
-
-    const projectRef = extractProjectRefFromAnonKey(anonKey);
-    if (!projectRef) {
-      problems.push("anon key could not be validated");
-    } else if (projectRef === PREVIOUS_SUPABASE_PROJECT_REF) {
-      problems.push("anon key still points to the previous Supabase project");
-    }
+  if (anonKey?.startsWith("sb_publishable_") || anonKey?.startsWith("eyJ")) {
+    return;
   }
+  if (anonKey) return;
 
-  if (problems.length === 0) return;
-
-  const keyHint = anonKey
-    ? `${anonKey.slice(0, 8)}...${anonKey.slice(-6)}`
-    : "<missing>";
   console.error(
-    `[Supabase config mismatch] NEXT_PUBLIC_SUPABASE_URL is ${TARGET_SUPABASE_URL}, but NEXT_PUBLIC_SUPABASE_ANON_KEY appears invalid for that project (${problems.join(
-      "; "
-    )}). Update NEXT_PUBLIC_SUPABASE_ANON_KEY from Supabase Dashboard > Project Settings > API > anon public.`,
-    { supabaseUrl, anonKeyHint: keyHint }
+    "[Supabase config mismatch] NEXT_PUBLIC_SUPABASE_ANON_KEY is missing or empty. Update NEXT_PUBLIC_SUPABASE_ANON_KEY from Supabase Dashboard > Project Settings > API > anon public.",
+    { supabaseUrl, anonKeyHint: "<missing>" }
   );
 }
 
@@ -102,10 +77,23 @@ function parseDocumentCookies(): Array<{ name: string; value: string }> {
 export function createClient() {
   if (!browserClient) {
     warnIfSupabaseConfigLooksMismatched();
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!url) {
+      throw new Error(
+        "Missing NEXT_PUBLIC_SUPABASE_URL. Set it in your environment before creating the Supabase browser client."
+      );
+    }
+    if (!key) {
+      throw new Error(
+        "Missing NEXT_PUBLIC_SUPABASE_ANON_KEY. Set it in your environment before creating the Supabase browser client."
+      );
+    }
 
     browserClient = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      url,
+      key,
       {
         cookies: {
           getAll() {
