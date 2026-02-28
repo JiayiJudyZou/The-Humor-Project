@@ -50,6 +50,9 @@ export default function CrackdPage() {
       const { data, error: supabaseError, count } = await supabase
         .from("images")
         .select("*", { count: "exact" })
+        .not("url", "is", null)
+        .neq("url", "")
+        .ilike("url", "http%")
         .range(0, PAGE_SIZE - 1);
 
       if (!isMounted) return;
@@ -97,17 +100,22 @@ export default function CrackdPage() {
     [rows]
   );
 
+  const visibleRowsByKey = useMemo(
+    () => rowsByKey.filter(({ key }) => !imageErrors[key]),
+    [rowsByKey, imageErrors]
+  );
+
   const filteredRows = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
-    if (!query) return rowsByKey;
-    return rowsByKey.filter(({ row }) => {
+    if (!query) return visibleRowsByKey;
+    return visibleRowsByKey.filter(({ row }) => {
       const description =
         typeof row.image_description === "string"
           ? row.image_description
           : "";
       return description.toLowerCase().includes(query);
     });
-  }, [rowsByKey, searchTerm]);
+  }, [visibleRowsByKey, searchTerm]);
 
   const hasMore =
     typeof totalCount === "number" ? rows.length < totalCount : false;
@@ -121,6 +129,9 @@ export default function CrackdPage() {
     const { data, error: supabaseError } = await supabase
       .from("images")
       .select("*")
+      .not("url", "is", null)
+      .neq("url", "")
+      .ilike("url", "http%")
       .range(from, to);
 
     if (supabaseError) {
@@ -213,7 +224,7 @@ export default function CrackdPage() {
           </div>
           <div className="text-sm text-zinc-600">
             Showing {filteredRows.length} of{" "}
-            {typeof totalCount === "number" ? totalCount : rows.length}
+            {visibleRowsByKey.length}
           </div>
         </div>
       </div>
@@ -231,7 +242,6 @@ export default function CrackdPage() {
             typeof row.image_description === "string"
               ? row.image_description
               : "";
-          const showImage = url && !imageErrors[key];
           const colorClass = CARD_COLORS[index % CARD_COLORS.length];
 
           return (
@@ -257,20 +267,16 @@ export default function CrackdPage() {
                     : "h-28 w-28 flex-shrink-0 md:h-32 md:w-40"
                 }`}
               >
-                {showImage ? (
-                  <img
-                    src={url}
-                    alt={description || "Crackd image"}
-                    className={`w-full object-cover ${
-                      viewMode === "grid" ? "h-40" : "h-28 md:h-32"
-                    }`}
-                    onError={() =>
-                      setImageErrors((prev) => ({ ...prev, [key]: true }))
-                    }
-                  />
-                ) : (
-                  <div className="text-sm text-zinc-600">Image unavailable</div>
-                )}
+                <img
+                  src={url}
+                  alt={description || "Crackd image"}
+                  className={`w-full object-cover ${
+                    viewMode === "grid" ? "h-40" : "h-28 md:h-32"
+                  }`}
+                  onError={() =>
+                    setImageErrors((prev) => ({ ...prev, [key]: true }))
+                  }
+                />
               </div>
               <div
                 className={`flex flex-1 ${

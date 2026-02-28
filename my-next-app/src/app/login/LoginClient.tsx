@@ -45,7 +45,7 @@ export default function LoginClient() {
       <div className="mx-auto flex min-h-screen max-w-5xl items-center justify-center px-6 py-10 pb-36 text-center">
         <div className="floating-card w-full max-w-xl rounded-2xl border border-white/45 bg-white/45 p-10 shadow-[0_20px_45px_rgba(15,23,42,0.18)] backdrop-blur-md">
           <h1 className="text-3xl font-extrabold text-zinc-900 sm:text-4xl">
-            Judy&rsquo;s Humor Project
+            Funny Captions!
           </h1>
           <button
             type="button"

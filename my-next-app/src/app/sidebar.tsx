@@ -7,6 +7,7 @@ const tabs = [
   { label: "Hello World", href: "/" },
   { label: "Crackd", href: "/crackd" },
   { label: "Vote", href: "/vote" },
+  { label: "Upload", href: "/upload" },
 ];
 
 export default function Sidebar() {
