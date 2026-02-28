@@ -47,3 +47,44 @@ Notes:
 - Keep changes minimal.
 - Do not add new dependencies unless needed.
 - Run `npm run build` before pushing to avoid Vercel TypeScript/build failures.
+
+# Week 5 Feature: Upload & Generate Captions (REST Pipeline)
+
+## New Protected Route
+- `/upload` is a protected route for authenticated users.
+- User selects an image file.
+- App calls the external REST pipeline at `https://api.almostcrackd.ai`.
+- App uploads file bytes via presigned URL and then displays generated captions.
+- App displays `cdnUrl` and `imageId` in the UI.
+- App shows an uploaded image preview using `cdnUrl`.
+- App includes a History drawer (top-right) with prior uploads + generated captions, stored in `localStorage` per user.
+
+## API Call Sequence (Step 1-4)
+Execute calls in this exact order:
+1. `POST /pipeline/generate-presigned-url`
+   - Header: `Authorization: Bearer <supabase access token>`
+2. `PUT <presignedUrl>`
+   - Header: `Content-Type: <image MIME type>`
+   - Body: raw file bytes
+3. `POST /pipeline/upload-image-from-url`
+   - Body includes: `imageUrl = cdnUrl`, `isCommonUse = false`
+4. `POST /pipeline/generate-captions`
+   - Body includes: `imageId`
+
+## Auth Requirements for Pipeline Calls
+- Access token source: `supabase.auth.getSession().data.session.access_token`
+- Required header format on protected pipeline endpoints:
+  - `Authorization: Bearer <token>`
+
+## Data Storage Constraint (No DB Schema Changes)
+- Do not change existing auth routes: keep `/login` and `/auth/callback` unchanged.
+- Do not change existing Supabase tables/queries used by prior assignments.
+- Upload history for Week 5 is client-side only, stored in `localStorage` (per user), not in Supabase tables.
+
+## Local Dev / Testing (Week 5)
+1. Start app locally and navigate to `/upload`.
+2. Choose an image file.
+3. Run the pipeline and verify generated captions appear.
+4. Verify `cdnUrl`, `imageId`, and image preview are shown.
+5. Open the History drawer from the top-right and confirm prior uploads/captions are listed.
+6. Close the drawer by clicking outside it.
