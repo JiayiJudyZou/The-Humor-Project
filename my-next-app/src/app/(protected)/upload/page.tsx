@@ -85,7 +85,7 @@ function readHistoryFromStorage(userId: string): UploadHistoryItem[] {
           typeof entry.cdnUrl === "string" &&
           typeof entry.imageId === "string" &&
           Array.isArray(entry.captions) &&
-          entry.captions.every((caption) => typeof caption === "string")
+          entry.captions.every((caption: unknown) => typeof caption === "string")
       )
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   } catch {
