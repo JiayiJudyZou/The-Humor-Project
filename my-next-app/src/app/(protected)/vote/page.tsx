@@ -411,8 +411,8 @@ export default function VotePage() {
         profile_id: user.id,
         caption_id: votingCaption.id,
         vote_value: voteValue,
-        created_datetime_utc: nowIso,
-        modified_datetime_utc: nowIso,
+        created_by_user_id: user.id,
+        modified_by_user_id: user.id,
       };
 
       const { error: upsertError } = await supabase

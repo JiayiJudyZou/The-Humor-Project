@@ -10,19 +10,27 @@ export default function LoginClient() {
   const [error, setError] = useState<string | null>(null);
   const urlError = searchParams.get("error");
   const displayError = error ?? (urlError ? `Sign-in error: ${urlError}` : null);
+  const hasPkceVerifierError = Boolean(
+    displayError?.toLowerCase().includes("pkce code verifier not found")
+  );
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
 
+    const redirectTo = `${window.location.origin}/auth/callback`;
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[login] OAuth redirect origin", {
+        origin: window.location.origin,
+        redirectTo,
+      });
+    }
+
     const supabase = createClient();
     const { data, error: signInError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: {
-          prompt: "select_account",
-        },
+        redirectTo,
       },
     });
 
@@ -55,7 +63,21 @@ export default function LoginClient() {
           >
             {loading ? "Connecting..." : "Continue with Google"}
           </button>
-          {displayError ? (
+          {hasPkceVerifierError ? (
+            <div className="mt-4 space-y-3">
+              <p className="text-sm text-red-600">
+                Please retry login in the same browser tab. If you used a
+                different domain or cleared storage, it can break PKCE.
+              </p>
+              <button
+                type="button"
+                onClick={() => window.location.assign("/login")}
+                className="inline-flex h-10 items-center justify-center rounded-full border border-zinc-900/20 bg-white/90 px-5 text-sm font-semibold text-zinc-900 transition hover:bg-white"
+              >
+                Retry
+              </button>
+            </div>
+          ) : displayError ? (
             <p className="mt-4 text-sm text-red-600">{displayError}</p>
           ) : null}
         </div>

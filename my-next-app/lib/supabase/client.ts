@@ -69,8 +69,13 @@ function parseDocumentCookies(): Array<{ name: string; value: string }> {
       const separatorIndex = entry.indexOf("=");
       const name =
         separatorIndex === -1 ? entry : entry.slice(0, separatorIndex);
-      const value = separatorIndex === -1 ? "" : entry.slice(separatorIndex + 1);
-      return { name, value };
+      const rawValue = separatorIndex === -1 ? "" : entry.slice(separatorIndex + 1);
+
+      try {
+        return { name, value: decodeURIComponent(rawValue) };
+      } catch {
+        return { name, value: rawValue };
+      }
     });
 }
 
@@ -103,7 +108,7 @@ export function createClient() {
             if (typeof document === "undefined") return;
 
             cookiesToSet.forEach(({ name, value, options }) => {
-              const parts = [`${name}=${value}`];
+              const parts = [`${name}=${encodeURIComponent(value)}`];
               const path = options?.path ?? "/";
               const sameSite = options?.sameSite ?? "lax";
 
@@ -115,10 +120,6 @@ export function createClient() {
 
               if (options?.secure) {
                 parts.push("Secure");
-              }
-
-              if (options?.httpOnly) {
-                parts.push("HttpOnly");
               }
 
               if (sameSite) {

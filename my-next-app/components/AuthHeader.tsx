@@ -99,6 +99,8 @@ export default function AuthHeader() {
         id: user.id,
         first_name: normalizedFirstName,
         last_name: normalizedLastName,
+        created_by_user_id: user.id,
+        modified_by_user_id: user.id,
       },
       { onConflict: "id" }
     );
