@@ -78,6 +78,8 @@ export default function VotePage() {
   const [user, setUser] = useState<User | null>(null);
   const [authResolved, setAuthResolved] = useState(false);
   const [captions, setCaptions] = useState<CaptionItem[]>([]);
+  const [sessionTotalCount, setSessionTotalCount] = useState(0);
+  const [sessionCompletedCount, setSessionCompletedCount] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [hasStarted, setHasStarted] = useState(false);
   const [startRequested, setStartRequested] = useState(false);
@@ -203,6 +205,8 @@ export default function VotePage() {
 
     const filteredCandidates = candidates.filter((caption) => !ratedCaptionIds.has(caption.id));
 
+    setSessionTotalCount(filteredCandidates.length);
+    setSessionCompletedCount(0);
     setCaptions(filteredCandidates);
     setCurrentIndex(0);
     setLoading(false);
@@ -439,6 +443,7 @@ export default function VotePage() {
         );
       });
 
+      setSessionCompletedCount((prev) => prev + 1);
       removeCaptionFromQueue(votingCaption.id);
     } catch (upsertException) {
       console.error("[vote] caption_votes.upsert threw", upsertException);
@@ -485,7 +490,8 @@ export default function VotePage() {
     slideTimeoutsRef.current.push(slideOutTimeout);
   };
 
-  const progress = `CAPTION ${Math.min(currentIndex + 1, captions.length)} / ${captions.length}`;
+  const progressCurrent = sessionTotalCount > 0 ? Math.min(sessionCompletedCount + 1, sessionTotalCount) : 0;
+  const progress = `CAPTION ${progressCurrent} / ${sessionTotalCount}`;
   const cardSlideStyle: CSSProperties = {
     transform:
       slidePhase === "out"
@@ -531,8 +537,14 @@ export default function VotePage() {
           </div>
         ) : captions.length === 0 ? (
           <section className="mx-auto mt-10 flex max-w-2xl flex-col items-center gap-4 rounded-3xl border border-white/45 bg-white/60 p-8 text-center shadow-[0_20px_45px_rgba(15,23,42,0.18)] backdrop-blur-md">
-            <h1 className="text-2xl font-semibold text-zinc-900">You&apos;re all caught up 🎉</h1>
-            <p className="text-sm text-zinc-700">You&apos;ve rated everything currently in your queue.</p>
+            <h1 className="text-2xl font-semibold text-zinc-900">
+              {sessionTotalCount === 0 ? "No captions left" : "You&apos;re all caught up 🎉"}
+            </h1>
+            <p className="text-sm text-zinc-700">
+              {sessionTotalCount === 0
+                ? "There are no captions available in your queue right now."
+                : "You&apos;ve rated everything currently in your queue."}
+            </p>
             <button
               type="button"
               onClick={() => {
