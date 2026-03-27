@@ -65,6 +65,10 @@ const isValidImageUrl = (value: string | null | undefined): value is string => {
   return trimmed.length > 0 && trimmed.startsWith("http");
 };
 
+const isValidCaptionContent = (value: string | null | undefined): value is string => {
+  return typeof value === "string" && value.trim().length > 0;
+};
+
 const formatUtcDateTime = (value: string | null) => {
   if (!value) return null;
   const date = new Date(value);
@@ -95,6 +99,8 @@ export default function VotePage() {
   const celebrationTimeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const slideTimeoutsRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
   const loggedFailedImageUrlsRef = useRef<Set<string>>(new Set());
+  const badCaptionIdsRef = useRef<Set<string>>(new Set());
+  const badImageUrlsRef = useRef<Set<string>>(new Set());
 
   const currentCaption = captions[currentIndex] ?? null;
 
@@ -176,8 +182,10 @@ export default function VotePage() {
         };
       })
       .filter((caption) => {
-        const imageId = caption.image_id === null ? null : String(caption.image_id);
-        return imageId !== null && isValidImageUrl(caption.image_url);
+        if (badCaptionIdsRef.current.has(caption.id)) return false;
+        if (!isValidCaptionContent(caption.content)) return false;
+        if (!isValidImageUrl(caption.image_url)) return false;
+        return !badImageUrlsRef.current.has(caption.image_url);
       });
 
     const candidateIds = candidates.map((caption) => caption.id);
@@ -454,9 +462,14 @@ export default function VotePage() {
   };
 
   const handleImageLoadError = (captionId: string, url: string | null) => {
+    badCaptionIdsRef.current.add(captionId);
+
     if (url && !loggedFailedImageUrlsRef.current.has(url)) {
       loggedFailedImageUrlsRef.current.add(url);
       console.error("[vote] image failed to load", { url });
+    }
+    if (isValidImageUrl(url)) {
+      badImageUrlsRef.current.add(url);
     }
 
     removeCaptionFromQueue(captionId);
@@ -568,7 +581,7 @@ export default function VotePage() {
                 />
               </div>
               <p className="mt-4 text-base leading-relaxed text-zinc-900">
-                {currentCaption.content?.trim() || "No caption content."}
+                {currentCaption.content}
               </p>
 
               <div className="mt-6 flex justify-center gap-6">
