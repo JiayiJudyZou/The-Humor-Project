@@ -32,7 +32,7 @@ export default function LogoutButton() {
       type="button"
       onClick={handleLogout}
       disabled={loading}
-      className="h-9 rounded-full border border-zinc-300 bg-white/80 px-4 text-xs font-semibold uppercase tracking-wide text-zinc-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+      className="ui-button h-10 rounded-full border border-zinc-200 bg-white/95 px-4 text-xs font-semibold uppercase tracking-[0.14em] text-zinc-700 shadow-[0_8px_20px_rgba(15,23,42,0.1)] hover:border-rose-200 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-70"
     >
       {loading ? "Signing out" : "Logout"}
     </button>

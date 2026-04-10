@@ -29,6 +29,8 @@ const CARD_COLORS = [
   "bg-[#FFF7C2]",
 ];
 
+const SKELETON_COUNT = 8;
+
 export default function CrackdPage() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [rows, setRows] = useState<ImageRow[]>([]);
@@ -68,12 +70,12 @@ export default function CrackdPage() {
       setLoading(false);
     };
 
-    fetchImages();
+    void fetchImages();
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     if (!selectedRow) return;
@@ -100,25 +102,18 @@ export default function CrackdPage() {
     [rows]
   );
 
-  const visibleRowsByKey = useMemo(
-    () => rowsByKey.filter(({ key }) => !imageErrors[key]),
-    [rowsByKey, imageErrors]
-  );
+  const visibleRowsByKey = useMemo(() => rowsByKey.filter(({ key }) => !imageErrors[key]), [rowsByKey, imageErrors]);
 
   const filteredRows = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     if (!query) return visibleRowsByKey;
     return visibleRowsByKey.filter(({ row }) => {
-      const description =
-        typeof row.image_description === "string"
-          ? row.image_description
-          : "";
+      const description = typeof row.image_description === "string" ? row.image_description : "";
       return description.toLowerCase().includes(query);
     });
   }, [visibleRowsByKey, searchTerm]);
 
-  const hasMore =
-    typeof totalCount === "number" ? rows.length < totalCount : false;
+  const hasMore = typeof totalCount === "number" ? rows.length < totalCount : false;
 
   const handleLoadMore = async () => {
     if (loadingMore || !hasMore) return;
@@ -142,69 +137,37 @@ export default function CrackdPage() {
     setLoadingMore(false);
   };
 
-  if (loading) {
-    return (
-      <div
-        className="text-sm text-zinc-700"
-        style={{ fontFamily: '"Times New Roman", Times, serif' }}
-      >
-        Loading...
-      </div>
-    );
-  }
-
   if (error) {
-    return (
-      <div
-        className="text-sm text-red-700"
-        style={{ fontFamily: '"Times New Roman", Times, serif' }}
-      >
-        Error: {error}
-      </div>
-    );
+    return <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">Error: {error}</div>;
   }
 
-  if (rows.length === 0) {
-    return (
-      <div
-        className="text-sm text-zinc-700"
-        style={{ fontFamily: '"Times New Roman", Times, serif' }}
-      >
-        No rows found.
-      </div>
-    );
+  if (!loading && rows.length === 0) {
+    return <div className="rounded-2xl border border-zinc-200 bg-white/70 px-4 py-3 text-sm text-zinc-700">No rows found.</div>;
   }
 
   return (
-    <section
-      className="flex flex-col gap-6"
-      style={{ fontFamily: '"Times New Roman", Times, serif' }}
-    >
+    <section className="page-enter flex w-full flex-col gap-6">
       <div className="flex flex-col gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900">Crackd</h1>
-          <p className="text-sm text-zinc-700">
-            A gallery of images fetched from Supabase.
-          </p>
+          <p className="text-sm text-zinc-700">A visual gallery of images fetched from Supabase.</p>
         </div>
 
-        <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200/70 bg-white/80 p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+        <div className="ui-surface-strong flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-1 flex-col gap-2 md:flex-row md:items-center">
             <input
               type="text"
               placeholder="Search descriptions..."
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              className="h-10 w-full rounded-full border border-zinc-300 bg-white/90 px-4 text-sm text-zinc-800 shadow-sm focus:border-zinc-400 focus:outline-none md:max-w-sm"
+              className="h-10 w-full rounded-full border border-zinc-300 bg-white/90 px-4 text-sm text-zinc-800 shadow-sm transition focus:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-100 md:max-w-sm"
             />
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setViewMode("grid")}
-                className={`h-10 rounded-full px-4 text-sm font-semibold transition ${
-                  viewMode === "grid"
-                    ? "bg-zinc-900 text-white"
-                    : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                className={`ui-button h-10 rounded-full px-4 text-sm font-semibold ${
+                  viewMode === "grid" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
                 }`}
               >
                 Grid view
@@ -212,106 +175,138 @@ export default function CrackdPage() {
               <button
                 type="button"
                 onClick={() => setViewMode("list")}
-                className={`h-10 rounded-full px-4 text-sm font-semibold transition ${
-                  viewMode === "list"
-                    ? "bg-zinc-900 text-white"
-                    : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                className={`ui-button h-10 rounded-full px-4 text-sm font-semibold ${
+                  viewMode === "list" ? "bg-zinc-900 text-white" : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
                 }`}
               >
                 List view
               </button>
             </div>
           </div>
-          <div className="text-sm text-zinc-600">
-            Showing {filteredRows.length} of{" "}
-            {visibleRowsByKey.length}
-          </div>
+          <div className="text-sm text-zinc-600">Showing {filteredRows.length} of {visibleRowsByKey.length}</div>
         </div>
       </div>
 
-      <div
-        className={
-          viewMode === "grid"
-            ? "grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-            : "flex flex-col gap-4"
-        }
-      >
-        {filteredRows.map(({ key, row, index }) => {
-          const url = typeof row.url === "string" ? row.url : "";
-          const description =
-            typeof row.image_description === "string"
-              ? row.image_description
-              : "";
-          const colorClass = CARD_COLORS[index % CARD_COLORS.length];
-
-          return (
-            <article
-              key={key}
-              role="button"
-              tabIndex={0}
-              onClick={() => setSelectedRow(row)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  setSelectedRow(row);
-                }
-              }}
-              className={`group flex w-full overflow-hidden rounded-2xl border border-white/70 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none ${
-                viewMode === "grid" ? "flex-col" : "flex-row"
-              } ${colorClass}`}
-            >
-              <div
-                className={`relative flex items-center justify-center ${
-                  viewMode === "grid"
-                    ? "h-40"
-                    : "h-28 w-28 flex-shrink-0 md:h-32 md:w-40"
-                }`}
-              >
-                <img
-                  src={url}
-                  alt={description || "Crackd image"}
-                  className={`w-full object-cover ${
-                    viewMode === "grid" ? "h-40" : "h-28 md:h-32"
-                  }`}
-                  onError={() =>
-                    setImageErrors((prev) => ({ ...prev, [key]: true }))
-                  }
-                />
-              </div>
-              <div
-                className={`flex flex-1 ${
-                  viewMode === "grid"
-                    ? "flex-col gap-3 p-4"
-                    : "flex-col gap-2 p-4 md:flex-row md:items-center md:justify-between"
-                }`}
-              >
-                <div className="flex-1">
-                  {description ? (
-                    <p
-                      className="text-sm text-zinc-800"
-                      style={{
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {description}
-                    </p>
-                  ) : (
-                    <p className="text-sm italic text-zinc-600">
-                      No description provided.
-                    </p>
-                  )}
-                </div>
-                <span className="text-xs text-zinc-500">
-                  Row {index + 1}
-                </span>
+      {loading ? (
+        <div className="columns-1 gap-5 sm:columns-2 lg:columns-3 2xl:columns-4">
+          {Array.from({ length: SKELETON_COUNT }).map((_, index) => (
+            <article key={`skeleton-${index}`} className="mb-5 break-inside-avoid rounded-2xl border border-white/70 bg-white/55 p-3 shadow-sm">
+              <div className="ui-skeleton h-40 w-full rounded-xl" />
+              <div className="mt-3 space-y-2">
+                <div className="ui-skeleton h-3 w-full rounded" />
+                <div className="ui-skeleton h-3 w-4/5 rounded" />
               </div>
             </article>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      ) : viewMode === "grid" ? (
+        <div className="columns-1 gap-5 sm:columns-2 lg:columns-3 2xl:columns-4">
+          {filteredRows.map(({ key, row, index }) => {
+            const url = typeof row.url === "string" ? row.url : "";
+            const description = typeof row.image_description === "string" ? row.image_description : "";
+            const colorClass = CARD_COLORS[index % CARD_COLORS.length];
+            const visualHeight = index % 3 === 0 ? "h-52" : index % 3 === 1 ? "h-40" : "h-44";
+
+            return (
+              <article
+                key={key}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedRow(row)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelectedRow(row);
+                  }
+                }}
+                className={`ui-card group mb-5 break-inside-avoid overflow-hidden rounded-2xl border border-white/70 shadow-sm focus:outline-none ${colorClass}`}
+              >
+                <div className={`relative flex items-center justify-center ${visualHeight}`}>
+                  <img
+                    src={url}
+                    alt={description || "Crackd image"}
+                    className={`h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]`}
+                    onError={() => setImageErrors((prev) => ({ ...prev, [key]: true }))}
+                  />
+                </div>
+                <div className="flex flex-col gap-3 p-4">
+                  <div className="flex-1">
+                    {description ? (
+                      <p
+                        className="text-sm text-zinc-800"
+                        style={{
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {description}
+                      </p>
+                    ) : (
+                      <p className="text-sm italic text-zinc-600">No description provided.</p>
+                    )}
+                  </div>
+                  <span className="text-xs text-zinc-500">Row {index + 1}</span>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {filteredRows.map(({ key, row, index }) => {
+            const url = typeof row.url === "string" ? row.url : "";
+            const description = typeof row.image_description === "string" ? row.image_description : "";
+            const colorClass = CARD_COLORS[index % CARD_COLORS.length];
+
+            return (
+              <article
+                key={key}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedRow(row)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelectedRow(row);
+                  }
+                }}
+                className={`ui-card group flex overflow-hidden rounded-2xl border border-white/70 shadow-sm focus:outline-none ${colorClass}`}
+              >
+                <div className="relative h-28 w-28 flex-shrink-0 md:h-32 md:w-40">
+                  <img
+                    src={url}
+                    alt={description || "Crackd image"}
+                    className="h-full w-full object-cover"
+                    onError={() => setImageErrors((prev) => ({ ...prev, [key]: true }))}
+                  />
+                </div>
+                <div className="flex flex-1 flex-col gap-2 p-4 md:flex-row md:items-center md:justify-between">
+                  <div className="flex-1">
+                    {description ? (
+                      <p
+                        className="text-sm text-zinc-800"
+                        style={{
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                        }}
+                      >
+                        {description}
+                      </p>
+                    ) : (
+                      <p className="text-sm italic text-zinc-600">No description provided.</p>
+                    )}
+                  </div>
+                  <span className="text-xs text-zinc-500">Row {index + 1}</span>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
 
       <div className="flex justify-center">
         {hasMore ? (
@@ -319,7 +314,7 @@ export default function CrackdPage() {
             type="button"
             onClick={handleLoadMore}
             disabled={loadingMore}
-            className="h-11 rounded-full bg-zinc-900 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+            className="ui-button h-11 rounded-full bg-zinc-900 px-6 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
           >
             {loadingMore ? "Loading more..." : "Load more"}
           </button>
@@ -329,23 +324,16 @@ export default function CrackdPage() {
       </div>
 
       {selectedRow ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <button
-            type="button"
-            aria-label="Close modal"
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setSelectedRow(null)}
-          />
-          <div className="relative z-10 flex w-[min(900px,92vw)] max-h-[88vh] flex-col overflow-hidden rounded-3xl border border-white/70 bg-white shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <button type="button" aria-label="Close modal" className="absolute inset-0 bg-black/45 backdrop-blur-[2px]" onClick={() => setSelectedRow(null)} />
+          <div className="modal-enter ui-surface-strong relative z-10 flex w-[min(900px,92vw)] max-h-[88vh] flex-col overflow-hidden">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-200/70 bg-white/95 px-6 py-4 backdrop-blur">
-              <h2 className="text-base font-semibold text-zinc-900">
-                Crackd image
-              </h2>
+              <h2 className="text-base font-semibold text-zinc-900">Crackd image</h2>
               <button
                 type="button"
                 aria-label="Close modal"
                 onClick={() => setSelectedRow(null)}
-                className="h-9 w-9 rounded-full border border-zinc-200 bg-white text-lg text-zinc-600 transition hover:bg-zinc-100"
+                className="ui-button h-9 w-9 rounded-full border border-zinc-200 bg-white text-lg text-zinc-600 hover:bg-zinc-100"
               >
                 ×
               </button>
@@ -356,22 +344,15 @@ export default function CrackdPage() {
                   {selectedRow.url ? (
                     <img
                       src={String(selectedRow.url)}
-                      alt={
-                        typeof selectedRow.image_description === "string"
-                          ? selectedRow.image_description
-                          : "Crackd image"
-                      }
+                      alt={typeof selectedRow.image_description === "string" ? selectedRow.image_description : "Crackd image"}
                       className="w-full max-h-[55vh] object-contain"
                     />
                   ) : (
-                    <div className="flex h-48 items-center justify-center text-sm text-zinc-600">
-                      Image unavailable
-                    </div>
+                    <div className="flex h-48 items-center justify-center text-sm text-zinc-600">Image unavailable</div>
                   )}
                 </div>
                 <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-zinc-800">
-                  {typeof selectedRow.image_description === "string" &&
-                  selectedRow.image_description.trim()
+                  {typeof selectedRow.image_description === "string" && selectedRow.image_description.trim()
                     ? selectedRow.image_description
                     : "No description provided."}
                 </p>

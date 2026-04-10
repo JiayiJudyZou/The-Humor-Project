@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
+import { createPortal } from "react-dom";
+
 type ProfileModalProps = {
   open: boolean;
   firstName: string;
@@ -23,39 +26,56 @@ export default function ProfileModal({
   onCancel,
   onSave,
 }: ProfileModalProps) {
-  if (!open) {
+  useEffect(() => {
+    if (!open) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onCancel();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, onCancel]);
+
+  if (!open || typeof document === "undefined") {
     return null;
   }
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4"
+      className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-950/40 p-4 sm:p-6"
+      onClick={onCancel}
       role="dialog"
       aria-modal="true"
       aria-labelledby="edit-profile-title"
     >
-      <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+      <div
+        className="modal-enter ui-surface-strong w-full max-w-md max-h-[85vh] overflow-y-auto p-5 sm:p-6"
+        onClick={(event) => event.stopPropagation()}
+      >
         <h2 id="edit-profile-title" className="text-base font-semibold text-zinc-900">
           Edit profile
         </h2>
 
         <div className="mt-4 space-y-3">
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wide text-zinc-600">First name</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-600">First name</span>
             <input
               value={firstName}
               onChange={(event) => onFirstNameChange(event.target.value)}
-              className="mt-1 h-10 w-full rounded-lg border border-zinc-300 px-3 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none"
+              className="mt-1 h-10 w-full rounded-xl border border-zinc-300 bg-white/85 px-3 text-sm text-zinc-900 focus:border-pink-300 focus:outline-none focus:ring-2 focus:ring-pink-100"
               autoComplete="given-name"
             />
           </label>
 
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wide text-zinc-600">Last name</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-600">Last name</span>
             <input
               value={lastName}
               onChange={(event) => onLastNameChange(event.target.value)}
-              className="mt-1 h-10 w-full rounded-lg border border-zinc-300 px-3 text-sm text-zinc-900 focus:border-zinc-500 focus:outline-none"
+              className="mt-1 h-10 w-full rounded-xl border border-zinc-300 bg-white/85 px-3 text-sm text-zinc-900 focus:border-pink-300 focus:outline-none focus:ring-2 focus:ring-pink-100"
               autoComplete="family-name"
             />
           </label>
@@ -68,7 +88,7 @@ export default function ProfileModal({
             type="button"
             onClick={onCancel}
             disabled={saving}
-            className="h-9 rounded-full border border-zinc-300 px-4 text-xs font-semibold uppercase tracking-wide text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-70"
+            className="ui-button h-9 rounded-full border border-zinc-300 px-4 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-700 disabled:cursor-not-allowed disabled:opacity-70"
           >
             Cancel
           </button>
@@ -76,12 +96,13 @@ export default function ProfileModal({
             type="button"
             onClick={onSave}
             disabled={saving}
-            className="h-9 rounded-full bg-zinc-900 px-4 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-70"
+            className="ui-button h-9 rounded-full border border-pink-200 bg-gradient-to-r from-pink-200 via-fuchsia-200 to-violet-200 px-4 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-900 shadow-[0_10px_24px_rgba(236,72,153,0.2)] hover:from-pink-300 hover:via-fuchsia-300 hover:to-violet-300 active:shadow-[0_6px_16px_rgba(236,72,153,0.22)] disabled:cursor-not-allowed disabled:opacity-70"
           >
             {saving ? "Saving..." : "Save"}
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

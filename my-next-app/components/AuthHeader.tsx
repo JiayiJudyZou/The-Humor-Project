@@ -69,6 +69,7 @@ export default function AuthHeader() {
     return null;
   }
 
+  const initials = `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase() || (user.email?.[0] ?? "U").toUpperCase();
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
   const displayName = fullName || user.email || "";
 
@@ -122,16 +123,23 @@ export default function AuthHeader() {
 
   return (
     <>
-      <div className="flex items-center gap-2">
+      <div className="relative">
         <button
           type="button"
           onClick={openEditor}
-          className="rounded-full bg-white/70 px-3 py-2 text-xs font-semibold text-zinc-700 shadow-sm transition hover:bg-white"
+          className="ui-button group inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white/95 px-2 py-1.5 pr-3 text-xs font-semibold text-zinc-700 shadow-[0_8px_20px_rgba(59,130,246,0.16)]"
           aria-label="Edit profile"
         >
-          {displayName}
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 via-indigo-500 to-pink-400 text-[11px] font-bold text-white">
+            {initials}
+          </span>
+          <span className="max-w-36 truncate text-left sm:max-w-44">{displayName}</span>
         </button>
-        {savedMessageVisible ? <span className="text-xs text-emerald-700">Saved</span> : null}
+        {savedMessageVisible ? (
+          <span className="toast-enter absolute -bottom-8 right-0 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 shadow-sm">
+            Saved
+          </span>
+        ) : null}
       </div>
 
       <ProfileModal

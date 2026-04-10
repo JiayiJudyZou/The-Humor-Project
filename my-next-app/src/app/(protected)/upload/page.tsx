@@ -111,18 +111,25 @@ function getProgressPercent(steps: StepState[]): number {
   return steps.filter((step) => step.status === "success").length * 25;
 }
 
-function getStepSegmentClass(step: StepState): string {
+function getStepIndicatorClass(step: StepState): string {
   if (step.status === "success") {
     return "border-emerald-300 bg-emerald-500 text-white";
   }
   if (step.status === "running") {
-    return "border-blue-400 bg-blue-100 text-blue-800 ring-2 ring-blue-200";
+    return "border-blue-300 bg-blue-100 text-blue-800 ring-2 ring-blue-200";
   }
   if (step.status === "error") {
     return "border-red-300 bg-red-100 text-red-700";
   }
 
   return "border-zinc-300 bg-zinc-100 text-zinc-500";
+}
+
+function getStepConnectorClass(step: StepState): string {
+  if (step.status === "success") return "bg-emerald-300";
+  if (step.status === "running") return "bg-blue-200";
+  if (step.status === "error") return "bg-red-200";
+  return "bg-zinc-200";
 }
 
 function formatTimestamp(isoString: string): string {
@@ -246,9 +253,7 @@ export default function UploadPage() {
         token,
         onStepUpdate: ({ step, status, message }) => {
           setSteps((prev) =>
-            prev.map((entry) =>
-              entry.step === step ? { ...entry, status, message } : entry
-            )
+            prev.map((entry) => (entry.step === step ? { ...entry, status, message } : entry))
           );
         },
       });
@@ -277,10 +282,7 @@ export default function UploadPage() {
           const nextHistoryItems = [nextHistoryEntry, ...prev].sort(
             (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           );
-          window.localStorage.setItem(
-            getHistoryStorageKey(userId),
-            JSON.stringify(nextHistoryItems)
-          );
+          window.localStorage.setItem(getHistoryStorageKey(userId), JSON.stringify(nextHistoryItems));
           return nextHistoryItems;
         });
       }
@@ -344,55 +346,45 @@ export default function UploadPage() {
   const stepErrorMessage = steps.find((step) => step.status === "error")?.message ?? error;
 
   return (
-    <section
-      className="mx-auto flex w-full max-w-4xl flex-col gap-6"
-      style={{ fontFamily: '"Times New Roman", Times, serif' }}
-    >
+    <section className="page-enter mx-auto flex w-full max-w-4xl flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
         <h1 className="text-2xl font-semibold text-zinc-900">Upload</h1>
         <button
           type="button"
           onClick={() => setHistoryOpen(true)}
-          className="rounded-full border border-zinc-300 px-4 py-1.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"
+          className="ui-button rounded-full border border-zinc-300 px-4 py-1.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-100"
         >
           History
         </button>
       </div>
-      <p className="-mt-4 text-sm text-zinc-700">
-        Upload an image and generate captions through the REST pipeline.
-      </p>
+      <p className="-mt-4 text-sm text-zinc-700">Upload an image and generate captions through the REST pipeline.</p>
 
-      <div className="rounded-2xl border border-zinc-200/70 bg-white/80 p-4 shadow-sm">
+      <div className="ui-surface-strong p-4 sm:p-5">
         <div className="flex items-center justify-between gap-3 text-sm text-zinc-800">
-          <p className="font-semibold">
-            Step {currentStep}/4
-          </p>
+          <p className="font-semibold">Step {currentStep}/4</p>
           <p className="text-xs font-semibold text-zinc-600">{progressPercent}%</p>
         </div>
-        <ol className="mt-3 grid grid-cols-4 gap-2">
-          {steps.map((step) => (
-            <li
-              key={step.step}
-              className={`rounded-full border px-2 py-1 text-center text-[11px] font-semibold uppercase tracking-wide ${getStepSegmentClass(step)}`}
-              title={STEP_LABELS[step.step]}
-            >
-              {step.step}
+
+        <ol className="mt-3 flex items-center gap-1.5 overflow-x-auto pb-1">
+          {steps.map((step, index) => (
+            <li key={step.step} className="flex min-w-max items-center gap-1.5">
+              <div className={`flex items-center gap-2 rounded-full border px-2.5 py-1 ${getStepIndicatorClass(step)}`}>
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/80 text-[11px] font-bold text-zinc-700">
+                  {step.step}
+                </span>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.12em]">{STEP_LABELS[step.step]}</span>
+              </div>
+              {index < steps.length - 1 ? (
+                <span className={`h-[2px] w-6 rounded-full ${getStepConnectorClass(step)}`} aria-hidden="true" />
+              ) : null}
             </li>
           ))}
         </ol>
-        <div className="mt-2 grid grid-cols-4 gap-2 text-[11px] text-zinc-600">
-          {steps.map((step) => (
-            <p key={`${step.step}-label`} className="truncate text-center">
-              {STEP_LABELS[step.step]}
-            </p>
-          ))}
-        </div>
-        {stepErrorMessage ? (
-          <p className="mt-2 text-xs text-red-700">{stepErrorMessage}</p>
-        ) : null}
+
+        {stepErrorMessage ? <p className="mt-2 text-xs text-red-700">{stepErrorMessage}</p> : null}
       </div>
 
-      <div className="rounded-2xl border border-zinc-200/70 bg-white/80 p-5 shadow-sm">
+      <div className="ui-surface p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-end">
           <label className="flex flex-1 flex-col gap-2 text-sm text-zinc-800">
             Choose image
@@ -403,7 +395,7 @@ export default function UploadPage() {
                 const selected = event.target.files?.[0] ?? null;
                 setFile(selected);
               }}
-              className="block w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm"
+              className="block w-full rounded-xl border border-zinc-300 bg-white/90 px-3 py-2 text-sm"
               disabled={running}
             />
           </label>
@@ -412,7 +404,7 @@ export default function UploadPage() {
             type="button"
             onClick={handleUploadAndGenerate}
             disabled={!file || running}
-            className="h-11 rounded-full bg-zinc-900 px-5 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-500"
+            className="ui-button h-11 rounded-full bg-zinc-900 px-5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-500"
           >
             {running ? "Running..." : "Upload & Generate Captions"}
           </button>
@@ -425,7 +417,7 @@ export default function UploadPage() {
       </div>
 
       {running || cdnUrl || imageId ? (
-        <div className="rounded-2xl border border-zinc-200/70 bg-white/80 p-5 shadow-sm">
+        <div className="ui-surface p-5">
           <h2 className="mb-2 text-lg font-semibold text-zinc-900">Pipeline Result</h2>
           {cdnUrl ? (
             <p className="break-all text-sm text-zinc-700">
@@ -447,35 +439,29 @@ export default function UploadPage() {
                   src={cdnUrl}
                   alt="Uploaded image preview"
                   onError={() => setImagePreviewFailed(true)}
-                  className="max-h-[360px] w-full rounded-xl object-contain shadow-sm"
+                  className="max-h-[360px] w-full rounded-2xl object-contain shadow-sm"
                 />
               )
             ) : (
-              <div
-                className="h-52 w-full animate-pulse rounded-xl border border-zinc-200 bg-zinc-100 shadow-sm"
-                aria-label="Uploaded image preview placeholder"
-              />
+              <div className="ui-skeleton h-52 w-full rounded-2xl" aria-label="Uploaded image preview placeholder" />
             )}
           </div>
         </div>
       ) : null}
 
       {captions.length > 0 ? (
-        <div className="rounded-2xl border border-zinc-200/70 bg-white/80 p-5 shadow-sm">
+        <div className="ui-surface p-5">
           <h2 className="mb-3 text-lg font-semibold text-zinc-900">Captions</h2>
           <ul className="flex flex-col gap-3">
             {captions.map((caption, index) => (
-              <li
-                key={`${caption.id}-${index}`}
-                className="rounded-xl border border-zinc-200 bg-white p-3"
-              >
+              <li key={`${caption.id}-${index}`} className="ui-card rounded-xl border border-zinc-200 bg-white/92 p-3">
                 <p className="mb-2 text-sm text-zinc-900">{caption.text}</p>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-xs text-zinc-500">Caption {index + 1}</span>
                   <button
                     type="button"
                     onClick={() => handleCopy(caption.id, caption.text)}
-                    className="rounded-full border border-zinc-300 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
+                    className="ui-button rounded-full border border-zinc-300 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
                   >
                     {copiedId === caption.id ? "Copied" : "Copy"}
                   </button>
@@ -487,29 +473,26 @@ export default function UploadPage() {
       ) : null}
 
       {historyOpen ? (
-        <div className="fixed inset-0 z-40">
+        <div className="fixed inset-0 z-50 flex">
           <button
             type="button"
             aria-label="Close history drawer"
             onClick={closeHistory}
-            className="absolute inset-0 z-40 bg-black/30"
+            className="absolute inset-0 z-40 bg-black/35 backdrop-blur-[2px]"
           />
-          <div
-            className="absolute inset-y-0 right-0 z-50 h-full w-full max-w-md overflow-y-auto border-l border-zinc-200 bg-white p-5 shadow-2xl"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="drawer-enter absolute inset-y-0 right-0 z-50 h-full w-full max-w-md overflow-y-auto border-l border-zinc-200/70 bg-white/96 p-5 shadow-2xl backdrop-blur-md">
+            <div className="mb-5 flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-zinc-900">Upload History</h2>
               <button
                 type="button"
                 onClick={closeHistory}
-                className="rounded-full border border-zinc-300 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
+                className="ui-button rounded-full border border-zinc-300 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
               >
                 Close
               </button>
             </div>
 
-            <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="mb-5 flex items-center justify-between gap-3">
               <p className="text-xs text-zinc-600">
                 {historyItems.length} item{historyItems.length === 1 ? "" : "s"}
               </p>
@@ -517,7 +500,7 @@ export default function UploadPage() {
                 type="button"
                 onClick={handleClearHistory}
                 disabled={!userId || historyItems.length === 0}
-                className="rounded-full border border-zinc-300 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                className="ui-button rounded-full border border-zinc-300 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Clear history
               </button>
@@ -526,7 +509,7 @@ export default function UploadPage() {
             {historyItems.length === 0 ? (
               <p className="text-sm text-zinc-600">No uploads saved yet.</p>
             ) : (
-              <ul className="flex flex-col gap-3">
+              <ul className="flex flex-col gap-4">
                 {historyItems.map((item, index) => {
                   const historyId = `${item.imageId}:${item.createdAt}:${index}`;
                   const isExpanded = expandedHistory[historyId] ?? false;
@@ -534,10 +517,10 @@ export default function UploadPage() {
                   const showImageFallback = historyImageErrors[historyId] ?? false;
 
                   return (
-                    <li key={historyId} className="rounded-xl border border-zinc-200 p-3">
+                    <li key={historyId} className="ui-card rounded-2xl border border-zinc-200/80 bg-white p-3.5">
                       {hasCdnUrl ? (
                         showImageFallback ? (
-                          <div className="mb-3 flex h-[180px] w-full items-center justify-center rounded-lg bg-zinc-100 px-2 text-xs text-zinc-600">
+                          <div className="mb-3 flex h-[180px] w-full items-center justify-center rounded-xl bg-zinc-100 px-2 text-xs text-zinc-600">
                             Preview unavailable
                           </div>
                         ) : (
@@ -547,7 +530,7 @@ export default function UploadPage() {
                             onError={() => {
                               setHistoryImageErrors((prev) => ({ ...prev, [historyId]: true }));
                             }}
-                            className="mb-3 h-[180px] w-full rounded-lg bg-zinc-100 object-contain"
+                            className="mb-3 h-[180px] w-full rounded-xl bg-zinc-100 object-contain"
                           />
                         )
                       ) : (
@@ -561,7 +544,7 @@ export default function UploadPage() {
                       <button
                         type="button"
                         onClick={() => toggleHistoryCaptions(historyId)}
-                        className="mb-2 rounded-full border border-zinc-300 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
+                        className="ui-button mb-2 rounded-full border border-zinc-300 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
                       >
                         {isExpanded ? "Hide captions" : "Show captions"}
                       </button>
@@ -576,7 +559,7 @@ export default function UploadPage() {
                       <button
                         type="button"
                         onClick={() => handleCopyAllCaptions(historyId, item.captions)}
-                        className="rounded-full border border-zinc-300 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
+                        className="ui-button rounded-full border border-zinc-300 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100"
                       >
                         {historyCopyState === historyId ? "Copied" : "Copy all captions"}
                       </button>

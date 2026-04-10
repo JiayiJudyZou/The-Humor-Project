@@ -8,16 +8,25 @@ export default function ProtectedLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#bfe9ff] to-[#ffcdf3]">
+    <div className="bg-cotton-candy min-h-screen">
       <div className="flex min-h-screen">
         <Sidebar />
-        <div className="flex min-h-screen flex-1 flex-col">
-          <header className="sticky top-0 z-50 flex items-center justify-end gap-4 border-b border-white/30 bg-transparent px-8 py-4 text-sm font-semibold tracking-wide text-zinc-800 shadow-sm backdrop-blur-md">
-            <span>Funny Captions!</span>
-            <AuthHeader />
-            <LogoutButton />
+
+        <div className="relative z-10 flex min-h-screen flex-1 flex-col">
+          <header className="sticky top-0 z-50 border-b border-white/45 bg-transparent px-5 py-3 backdrop-blur-xl sm:px-8">
+            <div className="ui-surface mx-auto flex max-w-7xl items-center justify-between gap-4 rounded-2xl px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-zinc-500">Funny Captions</p>
+                <p className="truncate text-sm font-semibold text-zinc-900">Creative caption workflow</p>
+              </div>
+              <div className="flex items-center gap-2 sm:gap-3">
+                <AuthHeader />
+                <LogoutButton />
+              </div>
+            </div>
           </header>
-          <main className="flex-1 px-6 pb-10 pt-6">{children}</main>
+
+          <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 px-4 pb-10 pt-6 sm:px-6">{children}</main>
         </div>
       </div>
     </div>

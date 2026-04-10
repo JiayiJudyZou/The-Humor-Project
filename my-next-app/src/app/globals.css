@@ -1,8 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f9ff;
+  --foreground: #161c2f;
+  --surface: rgba(255, 255, 255, 0.7);
+  --surface-strong: rgba(255, 255, 255, 0.9);
+  --border-soft: rgba(148, 163, 184, 0.3);
+  --ring-soft: rgba(59, 130, 246, 0.26);
+  --card-radius: 1.2rem;
+  --shadow-soft: 0 14px 34px rgba(15, 23, 42, 0.08);
+  --shadow-strong: 0 22px 50px rgba(15, 23, 42, 0.14);
 }
 
 @theme inline {
@@ -12,15 +19,205 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.65) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.66);
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 body {
-  background: var(--background);
+  min-height: 100vh;
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), "Inter", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(1200px 650px at 0% 0%, rgba(96, 165, 250, 0.24), transparent 62%),
+    radial-gradient(1000px 580px at 100% 0%, rgba(244, 114, 182, 0.16), transparent 60%),
+    linear-gradient(160deg, #f7fbff 0%, #eff5ff 42%, #f8f4ff 100%);
+}
+
+.bg-cotton-candy {
+  background:
+    radial-gradient(900px 600px at 50% 12%, rgba(255, 245, 252, 0.75), transparent 60%),
+    radial-gradient(800px 520px at 15% 25%, rgba(210, 236, 255, 0.55), transparent 62%),
+    radial-gradient(800px 520px at 85% 30%, rgba(255, 218, 232, 0.45), transparent 65%),
+    linear-gradient(135deg, #f3f7ff 0%, #f6f0ff 28%, #ffe9f2 62%, #eaf6ff 100%);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -460px 0;
+  }
+  100% {
+    background-position: 460px 0;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes drawerIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.page-enter {
+  animation: fadeInUp 420ms cubic-bezier(0.2, 0.75, 0.26, 1) both;
+}
+
+.route-enter {
+  animation: fadeInUp 360ms cubic-bezier(0.2, 0.72, 0.3, 1) both;
+}
+
+.float-gentle {
+  animation: float 4.6s ease-in-out infinite;
+}
+
+.ui-surface {
+  border: 1px solid var(--border-soft);
+  background: var(--surface);
+  border-radius: var(--card-radius);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(14px);
+}
+
+.ui-surface-strong {
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  background: var(--surface-strong);
+  border-radius: calc(var(--card-radius) + 0.2rem);
+  box-shadow: var(--shadow-strong);
+  backdrop-filter: blur(16px);
+}
+
+.ui-card {
+  transition:
+    transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 220ms ease,
+    border-color 220ms ease,
+    background-color 220ms ease;
+}
+
+.ui-card:hover {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+}
+
+.ui-card:focus-within {
+  outline: 2px solid var(--ring-soft);
+  outline-offset: 2px;
+}
+
+.ui-button {
+  transition:
+    transform 170ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 200ms ease,
+    border-color 200ms ease,
+    background-color 200ms ease,
+    color 200ms ease;
+}
+
+.ui-button:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.012);
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+}
+
+.ui-button:focus-visible {
+  outline: 2px solid var(--ring-soft);
+  outline-offset: 2px;
+}
+
+.ui-button:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.ui-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.55) 0%,
+    rgba(248, 250, 252, 0.95) 50%,
+    rgba(226, 232, 240, 0.55) 100%
+  );
+  background-size: 460px 100%;
+  animation: shimmer 1.3s ease-in-out infinite;
+}
+
+.drawer-enter {
+  animation: drawerIn 360ms cubic-bezier(0.2, 0.78, 0.24, 1) both;
+}
+
+.modal-enter {
+  animation: modalIn 320ms cubic-bezier(0.22, 0.72, 0.29, 1) both;
+}
+
+.toast-enter {
+  animation: toastIn 240ms ease-out both;
+}
+
+.fade-slide-in {
+  animation: fadeSlideIn 280ms ease-out both;
 }
