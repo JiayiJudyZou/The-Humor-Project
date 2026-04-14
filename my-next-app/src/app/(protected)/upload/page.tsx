@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "../../../../lib/supabase/client";
 import {
   generateCaptionsOnly,
+  normalizeImageContentType,
+  normalizeImageFileForUpload,
   PipelineError,
   type PipelineStep,
   type PipelineStepStatus,
@@ -30,7 +32,6 @@ type UploadHistoryItem = {
 
 const SUPPORTED_TYPES = new Set([
   "image/jpeg",
-  "image/jpg",
   "image/png",
   "image/webp",
   "image/gif",
@@ -277,9 +278,13 @@ export default function UploadPage() {
 
     if (!file || running) return;
 
-    if (!SUPPORTED_TYPES.has(file.type)) {
+    const normalizedSelectedType = normalizeImageContentType(file);
+    if (!normalizedSelectedType || !SUPPORTED_TYPES.has(normalizedSelectedType)) {
       if (isDev) {
-        console.log("[UPLOAD] unsupported type", file?.type);
+        console.log("[UPLOAD] unsupported type", {
+          originalType: file?.type,
+          normalizedType: normalizedSelectedType,
+        });
       }
       setError(
         `Unsupported file type: ${file.type || "unknown"}. Supported: image/jpeg, image/jpg, image/png, image/webp, image/gif, image/heic`
@@ -300,6 +305,18 @@ export default function UploadPage() {
       if (isDev) {
         console.log("[UPLOAD] token ready", { hasToken: !!token });
       }
+      const normalizedUpload = await normalizeImageFileForUpload(file);
+      if (isDev) {
+        console.log("[UPLOAD] normalized file", {
+          originalFileName: file.name,
+          originalType: file.type,
+          normalizedType: normalizedUpload.contentType,
+          originalWidth: normalizedUpload.width,
+          originalHeight: normalizedUpload.height,
+          processedWidth: normalizedUpload.processedWidth,
+          processedHeight: normalizedUpload.processedHeight,
+        });
+      }
       if (isDev) {
         console.log("[UPLOAD] calling runCaptionPipeline");
       }
@@ -307,7 +324,8 @@ export default function UploadPage() {
       let result: Awaited<ReturnType<typeof runCaptionPipeline>>;
       try {
         result = await runCaptionPipeline({
-          file,
+          file: normalizedUpload.file,
+          contentType: normalizedUpload.contentType,
           token,
           onStepUpdate: ({ step, status, message }) => {
             setSteps((prev) =>
@@ -526,6 +544,9 @@ export default function UploadPage() {
             </button>
           </div>
         </div>
+        <p className="mt-3 text-xs text-zinc-600">
+          Small or text-heavy meme images may work better after automatic resizing before upload.
+        </p>
         {file ? (
           <p className="mt-3 text-xs text-zinc-600">
             Selected: {file.name} ({file.type || "unknown type"})

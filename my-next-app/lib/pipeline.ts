@@ -20,8 +20,18 @@ export type PipelineResult = {
 
 export type RunPipelineParams = {
   file: File;
+  contentType: string;
   token: string;
   onStepUpdate?: (update: PipelineStepUpdate) => void;
+};
+
+export type NormalizeImageFileResult = {
+  file: File;
+  contentType: string;
+  width?: number;
+  height?: number;
+  processedWidth?: number;
+  processedHeight?: number;
 };
 
 export class PipelineError extends Error {
@@ -152,13 +162,198 @@ function assertString(value: unknown, label: string, step: PipelineStep): string
   return value;
 }
 
+const SUPPORTED_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/heic",
+]);
+
+const PREPROCESS_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+  heic: "image/heic",
+};
+
+function normalizeContentType(rawType: string): string | null {
+  const trimmed = rawType.trim().toLowerCase();
+  if (!trimmed) return null;
+  if (trimmed === "image/jpg") return "image/jpeg";
+  if (SUPPORTED_IMAGE_TYPES.has(trimmed)) return trimmed;
+  return null;
+}
+
+function getContentTypeFromFileName(fileName: string): string | null {
+  const lastDot = fileName.lastIndexOf(".");
+  if (lastDot < 0 || lastDot === fileName.length - 1) return null;
+  const extension = fileName.slice(lastDot + 1).trim().toLowerCase();
+  return MIME_BY_EXTENSION[extension] ?? null;
+}
+
+export function normalizeImageContentType(file: Pick<File, "type" | "name">): string | null {
+  return normalizeContentType(file.type) ?? getContentTypeFromFileName(file.name);
+}
+
+function loadImageElement(file: File): Promise<{ image: HTMLImageElement; cleanup: () => void }> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    const cleanup = () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+
+    image.onload = () => {
+      resolve({ image, cleanup });
+    };
+
+    image.onerror = () => {
+      cleanup();
+      reject(new Error("Unable to decode image in browser."));
+    };
+
+    image.src = objectUrl;
+  });
+}
+
+async function maybeReadImageDimensions(file: File): Promise<{ width?: number; height?: number }> {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  try {
+    const loaded = await loadImageElement(file);
+    const width = loaded.image.naturalWidth || undefined;
+    const height = loaded.image.naturalHeight || undefined;
+    loaded.cleanup();
+    return { width, height };
+  } catch {
+    return {};
+  }
+}
+
+function canvasToBlob(
+  canvas: HTMLCanvasElement,
+  outputType: "image/jpeg" | "image/png"
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Failed to convert canvas to blob."));
+          return;
+        }
+        resolve(blob);
+      },
+      outputType,
+      outputType === "image/jpeg" ? 0.92 : undefined
+    );
+  });
+}
+
+export async function normalizeImageFileForUpload(file: File): Promise<NormalizeImageFileResult> {
+  const contentType = normalizeImageContentType(file);
+  if (!contentType) {
+    throw new Error(
+      `Unsupported file type: ${file.type || "unknown"}. Supported: image/jpeg, image/jpg, image/png, image/webp, image/gif, image/heic`
+    );
+  }
+
+  if (typeof window === "undefined") {
+    return { file, contentType };
+  }
+
+  if (!PREPROCESS_IMAGE_TYPES.has(contentType)) {
+    const dimensions = await maybeReadImageDimensions(file);
+    return {
+      file,
+      contentType,
+      width: dimensions.width,
+      height: dimensions.height,
+    };
+  }
+
+  let loadedImage: { image: HTMLImageElement; cleanup: () => void } | null = null;
+  try {
+    loadedImage = await loadImageElement(file);
+  } catch {
+    return { file, contentType };
+  }
+
+  const width = loadedImage.image.naturalWidth || undefined;
+  const height = loadedImage.image.naturalHeight || undefined;
+
+  if (!width || !height) {
+    loadedImage.cleanup();
+    return { file, contentType };
+  }
+
+  const shorterSide = Math.min(width, height);
+  if (shorterSide >= 512) {
+    loadedImage.cleanup();
+    return { file, contentType, width, height };
+  }
+
+  const scale = 512 / shorterSide;
+  const processedWidth = Math.max(1, Math.round(width * scale));
+  const processedHeight = Math.max(1, Math.round(height * scale));
+  const outputType: "image/jpeg" | "image/png" =
+    contentType === "image/jpeg" ? "image/jpeg" : "image/png";
+
+  const canvas = document.createElement("canvas");
+  canvas.width = processedWidth;
+  canvas.height = processedHeight;
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    loadedImage.cleanup();
+    return { file, contentType, width, height };
+  }
+
+  context.drawImage(loadedImage.image, 0, 0, processedWidth, processedHeight);
+
+  try {
+    const processedBlob = await canvasToBlob(canvas, outputType);
+    const processedFile = new File([processedBlob], file.name, {
+      type: outputType,
+      lastModified: file.lastModified,
+    });
+    return {
+      file: processedFile,
+      contentType: outputType,
+      width,
+      height,
+      processedWidth,
+      processedHeight,
+    };
+  } catch {
+    return { file, contentType, width, height };
+  } finally {
+    loadedImage.cleanup();
+  }
+}
+
 export async function runCaptionPipeline({
   file,
+  contentType,
   token,
   onStepUpdate,
 }: RunPipelineParams): Promise<PipelineResult> {
   if (!token.trim()) {
     throw new PipelineError(1, "Missing access token. Please sign in again.");
+  }
+  if (!contentType.trim()) {
+    throw new PipelineError(1, "Missing file content type.");
   }
 
   onStepUpdate?.({ step: 1, status: "running" });
@@ -168,7 +363,7 @@ export async function runCaptionPipeline({
     const presigned = await postJson<GeneratePresignedResponse>(
       "/pipeline/generate-presigned-url",
       token,
-      { contentType: file.type },
+      { contentType },
       1
     );
     presignedUrl = assertString(presigned.presignedUrl, "presignedUrl", 1);
@@ -188,7 +383,7 @@ export async function runCaptionPipeline({
     const uploadResponse = await fetch(presignedUrl, {
       method: "PUT",
       headers: {
-        "Content-Type": file.type,
+        "Content-Type": contentType,
       },
       body: file,
     });
