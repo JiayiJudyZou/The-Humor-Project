@@ -196,7 +196,7 @@ export default function VotePage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [user, setUser] = useState<User | null>(null);
-  const [authResolved, setAuthResolved] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [captions, setCaptions] = useState<CaptionItem[]>([]);
   const [sessionTotalCount, setSessionTotalCount] = useState(0);
   const [sessionCompletedCount, setSessionCompletedCount] = useState(0);
@@ -459,30 +459,21 @@ export default function VotePage() {
     let isMounted = true;
 
     const loadUser = async () => {
-      const {
-        data: { user: sessionUser },
-        error: userError,
-      } = await supabase.auth.getUser();
+      try {
+        const {
+          data: { user: sessionUser },
+        } = await supabase.auth.getUser();
 
-      if (!isMounted) return;
-
-      if (userError) {
-        console.error("[vote] supabase.auth.getUser failed", userError);
-        setError("Could not validate your session. Please refresh or sign in again.");
-        setAuthResolved(true);
-        setLoading(false);
-        return;
+        if (!isMounted) return;
+        setUser(sessionUser ?? null);
+      } catch (userException) {
+        if (!isMounted) return;
+        console.error("[vote] supabase.auth.getUser threw", userException);
+        setUser(null);
+      } finally {
+        if (!isMounted) return;
+        setAuthChecked(true);
       }
-
-      if (!sessionUser) {
-        setAuthResolved(true);
-        setLoading(false);
-        router.replace("/login");
-        return;
-      }
-
-      setUser(sessionUser);
-      setAuthResolved(true);
     };
 
     void loadUser();
@@ -490,12 +481,18 @@ export default function VotePage() {
     return () => {
       isMounted = false;
     };
-  }, [router, supabase]);
+  }, [supabase]);
 
   useEffect(() => {
-    if (!authResolved || !user) return;
+    if (!authChecked || user) return;
+    setLoading(false);
+    router.replace("/login");
+  }, [authChecked, router, user]);
+
+  useEffect(() => {
+    if (!authChecked || !user) return;
     void loadQueue();
-  }, [authResolved, loadQueue, user]);
+  }, [authChecked, loadQueue, user]);
 
   useEffect(() => {
     if (!ratedDrawerOpen || !user) return;
@@ -556,7 +553,11 @@ export default function VotePage() {
   };
 
   const handleVote = async (voteValue: 1 | -1) => {
-    if (!user || !currentCaption || submittingVote) return;
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+    if (!currentCaption || submittingVote) return;
 
     setSubmittingVote(true);
     setError(null);
@@ -630,7 +631,11 @@ export default function VotePage() {
   };
 
   const handleVoteWithSlide = (voteValue: 1 | -1) => {
-    if (!user || !currentCaption || submittingVote || slidePhase !== "idle") return;
+    if (!user) {
+      router.replace("/login");
+      return;
+    }
+    if (!currentCaption || submittingVote || slidePhase !== "idle") return;
 
     const shouldAnimateIn = captions.length > 1;
     triggerCelebration(voteValue === 1 ? "up" : "down");
@@ -671,7 +676,7 @@ export default function VotePage() {
     }, START_TRANSITION_MS);
   }, [introPhase]);
 
-  const queueReady = authResolved && !loading;
+  const queueReady = authChecked && !loading;
 
   useEffect(() => {
     if (!startRequested || !queueReady) return;
@@ -702,6 +707,33 @@ export default function VotePage() {
         : `transform ${SLIDE_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1), opacity ${SLIDE_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1), filter ${SLIDE_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
     willChange: "transform, opacity, filter",
   };
+
+  if (!authChecked) {
+    return (
+      <div className="relative z-0 w-full px-2 pb-10 pt-2 sm:px-4">
+        <section className="mx-auto w-full max-w-3xl">
+          <div className="mx-auto mt-3 w-full max-w-3xl overflow-hidden rounded-[34px] border border-white/60 bg-white/70 p-6 shadow-[0_24px_74px_rgba(15,23,42,0.22)] backdrop-blur-xl sm:p-7">
+            <div className="relative overflow-hidden">
+              <div className="skeleton-shimmer pointer-events-none absolute inset-0 opacity-70" />
+              <div className="mb-4 h-3 w-36 rounded-full bg-white/65" />
+              <div className="overflow-hidden rounded-[22px] border border-white/65">
+                <div className="h-72 w-full animate-pulse bg-gradient-to-br from-zinc-200/75 via-white/70 to-zinc-200/70 sm:h-96" />
+              </div>
+              <div className="mt-5 space-y-3">
+                <div className="h-4 w-11/12 rounded-full bg-white/75" />
+                <div className="h-4 w-10/12 rounded-full bg-white/65" />
+                <div className="h-4 w-8/12 rounded-full bg-white/55" />
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  if (authChecked && !user) {
+    return null;
+  }
 
   return (
     <div className="page-enter relative z-0 w-full px-2 pb-10 pt-2 sm:px-4">

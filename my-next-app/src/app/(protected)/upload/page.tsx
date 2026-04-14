@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "../../../../lib/supabase/client";
 import {
+  generateCaptionsOnly,
   PipelineError,
   type PipelineStep,
   type PipelineStepStatus,
@@ -139,6 +140,7 @@ function formatTimestamp(isoString: string): string {
 }
 
 export default function UploadPage() {
+  const isDev = process.env.NODE_ENV === "development";
   const supabase = useMemo(() => createClient(), []);
   const [file, setFile] = useState<File | null>(null);
   const [running, setRunning] = useState(false);
@@ -155,6 +157,8 @@ export default function UploadPage() {
   const [expandedHistory, setExpandedHistory] = useState<Record<string, boolean>>({});
   const [historyCopyState, setHistoryCopyState] = useState<string | null>(null);
   const [historyImageErrors, setHistoryImageErrors] = useState<Record<string, boolean>>({});
+  const [debugHasTokenAfterSession, setDebugHasTokenAfterSession] = useState<boolean | null>(null);
+  const [captionFailureCount, setCaptionFailureCount] = useState(0);
 
   useEffect(() => {
     setImagePreviewFailed(false);
@@ -216,10 +220,67 @@ export default function UploadPage() {
     setImagePreviewFailed(false);
   };
 
+  const mapCaptions = (records: Array<Record<string, unknown>>): CaptionDisplay[] => {
+    return records.map((record, index) => ({
+      id: String(record.id ?? record.captionId ?? index),
+      text: getCaptionText(record),
+    }));
+  };
+
+  const appendHistoryEntry = (nextCdnUrl: string, nextImageId: string, nextCaptions: CaptionDisplay[]) => {
+    if (!userId) return;
+
+    const nextHistoryEntry: UploadHistoryItem = {
+      createdAt: new Date().toISOString(),
+      cdnUrl: nextCdnUrl,
+      imageId: nextImageId,
+      captions: nextCaptions.map((caption) => caption.text),
+    };
+
+    setHistoryItems((prev) => {
+      const nextHistoryItems = [nextHistoryEntry, ...prev].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+      window.localStorage.setItem(getHistoryStorageKey(userId), JSON.stringify(nextHistoryItems));
+      return nextHistoryItems;
+    });
+  };
+
+  const getAccessToken = async (): Promise<string> => {
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+    setDebugHasTokenAfterSession(!!session?.access_token);
+
+    if (sessionError) {
+      throw new Error(`Session error: ${sessionError.message}`);
+    }
+
+    const token = session?.access_token;
+    if (!token) {
+      throw new Error("No access token found. Please sign in again.");
+    }
+
+    return token;
+  };
+
   const handleUploadAndGenerate = async () => {
+    if (isDev) {
+      console.log("[UPLOAD] click", {
+        hasFile: !!file,
+        running,
+        fileType: file?.type,
+        fileName: file?.name,
+      });
+    }
+
     if (!file || running) return;
 
     if (!SUPPORTED_TYPES.has(file.type)) {
+      if (isDev) {
+        console.log("[UPLOAD] unsupported type", file?.type);
+      }
       setError(
         `Unsupported file type: ${file.type || "unknown"}. Supported: image/jpeg, image/jpg, image/png, image/webp, image/gif, image/heic`
       );
@@ -227,30 +288,82 @@ export default function UploadPage() {
     }
 
     resetRunState();
+    setCaptionFailureCount(0);
     setRunning(true);
-
-    const {
-      data: { session },
-      error: sessionError,
-    } = await supabase.auth.getSession();
-
-    if (sessionError) {
-      setError(`Session error: ${sessionError.message}`);
-      setRunning(false);
-      return;
-    }
-
-    const token = session?.access_token;
-    if (!token) {
-      setError("No access token found. Please sign in again.");
-      setRunning(false);
-      return;
+    setDebugHasTokenAfterSession(null);
+    if (isDev) {
+      console.log("[UPLOAD] starting session fetch");
     }
 
     try {
-      const result = await runCaptionPipeline({
-        file,
+      const token = await getAccessToken();
+      if (isDev) {
+        console.log("[UPLOAD] token ready", { hasToken: !!token });
+      }
+      if (isDev) {
+        console.log("[UPLOAD] calling runCaptionPipeline");
+      }
+
+      let result: Awaited<ReturnType<typeof runCaptionPipeline>>;
+      try {
+        result = await runCaptionPipeline({
+          file,
+          token,
+          onStepUpdate: ({ step, status, message }) => {
+            setSteps((prev) =>
+              prev.map((entry) => (entry.step === step ? { ...entry, status, message } : entry))
+            );
+          },
+        });
+      } catch (unknownError) {
+        if (isDev) {
+          console.error("[UPLOAD] runCaptionPipeline threw", unknownError);
+        }
+        throw unknownError;
+      }
+
+      setCdnUrl(result.cdnUrl);
+      setImageId(result.imageId);
+
+      const nextCaptions = mapCaptions(result.captions);
+      setCaptions(nextCaptions);
+      setCaptionFailureCount(0);
+
+      appendHistoryEntry(result.cdnUrl, result.imageId, nextCaptions);
+    } catch (unknownError) {
+      if (unknownError instanceof PipelineError) {
+        if (unknownError.step === 4) {
+          setCdnUrl((prev) => unknownError.cdnUrl ?? prev);
+          setImageId((prev) => unknownError.imageId ?? prev);
+          setCaptionFailureCount((prev) => prev + 1);
+        }
+        setError(unknownError.message);
+      } else {
+        const message = unknownError instanceof Error ? unknownError.message : "Unknown error";
+        setError(message);
+      }
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const handleRetryCaptions = async () => {
+    if (!imageId || running) return;
+
+    setRunning(true);
+    setError(null);
+    setCaptions([]);
+    setSteps((prev) =>
+      prev.map((entry) =>
+        entry.step === 4 ? { ...entry, status: "idle", message: undefined } : entry
+      )
+    );
+
+    try {
+      const token = await getAccessToken();
+      const retryResult = await generateCaptionsOnly({
         token,
+        imageId,
         onStepUpdate: ({ step, status, message }) => {
           setSteps((prev) =>
             prev.map((entry) => (entry.step === step ? { ...entry, status, message } : entry))
@@ -258,37 +371,17 @@ export default function UploadPage() {
         },
       });
 
-      setCdnUrl(result.cdnUrl);
-      setImageId(result.imageId);
-
-      const nextCaptions: CaptionDisplay[] = result.captions.map((record, index) => {
-        const raw = record as Record<string, unknown>;
-        return {
-          id: String(raw.id ?? raw.captionId ?? index),
-          text: getCaptionText(raw),
-        };
-      });
+      const nextCaptions = mapCaptions(retryResult);
       setCaptions(nextCaptions);
+      setCaptionFailureCount(0);
 
-      if (userId) {
-        const nextHistoryEntry: UploadHistoryItem = {
-          createdAt: new Date().toISOString(),
-          cdnUrl: result.cdnUrl,
-          imageId: result.imageId,
-          captions: nextCaptions.map((caption) => caption.text),
-        };
-
-        setHistoryItems((prev) => {
-          const nextHistoryItems = [nextHistoryEntry, ...prev].sort(
-            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-          window.localStorage.setItem(getHistoryStorageKey(userId), JSON.stringify(nextHistoryItems));
-          return nextHistoryItems;
-        });
+      if (cdnUrl) {
+        appendHistoryEntry(cdnUrl, imageId, nextCaptions);
       }
     } catch (unknownError) {
       if (unknownError instanceof PipelineError) {
-        setError(`Step ${unknownError.step} failed: ${unknownError.message}`);
+        setCaptionFailureCount((prev) => prev + 1);
+        setError(unknownError.message);
       } else {
         const message = unknownError instanceof Error ? unknownError.message : "Unknown error";
         setError(message);
@@ -344,6 +437,7 @@ export default function UploadPage() {
   const currentStep = getCurrentStep(steps);
   const progressPercent = getProgressPercent(steps);
   const stepErrorMessage = steps.find((step) => step.status === "error")?.message ?? error;
+  const canRetryCaptions = steps.some((step) => step.step === 4 && step.status === "error") && !!imageId;
 
   return (
     <section className="page-enter mx-auto flex w-full max-w-4xl flex-col gap-6">
@@ -382,6 +476,21 @@ export default function UploadPage() {
         </ol>
 
         {stepErrorMessage ? <p className="mt-2 text-xs text-red-700">{stepErrorMessage}</p> : null}
+        {canRetryCaptions ? (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleRetryCaptions}
+              disabled={running}
+              className="ui-button rounded-full border border-zinc-300 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {running ? "Retrying captions..." : "Retry captions"}
+            </button>
+            {captionFailureCount >= 2 ? (
+              <p className="text-xs text-amber-700">Still failing. Try a different image.</p>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="ui-surface p-5">
@@ -400,14 +509,22 @@ export default function UploadPage() {
             />
           </label>
 
-          <button
-            type="button"
-            onClick={handleUploadAndGenerate}
-            disabled={!file || running}
-            className="ui-button h-11 rounded-full bg-zinc-900 px-5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-500"
-          >
-            {running ? "Running..." : "Upload & Generate Captions"}
-          </button>
+          <div className="flex flex-col gap-1.5">
+            {isDev ? (
+              <p className="text-xs text-zinc-600 md:text-right">
+                debug: hasFile={String(!!file)} | running={String(running)} | file.type={file?.type || "none"} |
+                tokenAfterSession={debugHasTokenAfterSession === null ? "unknown" : String(debugHasTokenAfterSession)}
+              </p>
+            ) : null}
+            <button
+              type="button"
+              onClick={handleUploadAndGenerate}
+              disabled={!file || running}
+              className="ui-button h-11 rounded-full bg-zinc-900 px-5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-500"
+            >
+              {running ? "Running..." : "Upload & Generate Captions"}
+            </button>
+          </div>
         </div>
         {file ? (
           <p className="mt-3 text-xs text-zinc-600">
